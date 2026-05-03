@@ -1,0 +1,120 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/vehicles/[id] — update vehicle master
+// GET   /api/vehicles/[id] — fetch single vehicle (JSON)
+// ─────────────────────────────────────────────────────────────────────────────
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { z } from "zod";
+
+const updateSchema = z.object({
+  vehicleName:        z.string().optional(),
+  make:               z.string().optional(),
+  model:              z.string().optional(),
+  vehicleType:        z.enum(["FOUR_WHEELER", "TWO_WHEELER", "VAN", "TRUCK", "OTHER"]).optional(),
+  fuelType:           z.enum(["PETROL", "DIESEL", "CNG", "EV", "HYBRID"]).optional(),
+  ownershipType:      z.enum(["OWNED", "LEASED", "HIRED"]).optional(),
+  yearOfManufacture:  z.coerce.number().optional(),
+  engineNumber:       z.string().optional(),
+  chassisNumber:      z.string().optional(),
+  registrationDate:   z.string().optional(),
+  registrationExpiry: z.string().optional(),
+  odometer:           z.coerce.number().optional(),
+  seatingCapacity:    z.coerce.number().optional(),
+  loadCapacity:       z.coerce.number().optional(),
+  colour:             z.string().optional(),
+  fastagNumber:       z.string().optional(),
+  purposeOfUsage:     z.string().optional(),
+  status:             z.enum(["ACTIVE", "IN_SERVICE", "INACTIVE", "DISPOSED"]).optional(),
+  branchId:           z.string().optional(),
+  driverId:           z.string().nullable().optional(),
+  remarks:            z.string().optional(),
+});
+
+interface Ctx {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const vehicle = await db.vehicle.findUnique({
+    where: { id },
+    include: {
+      branch: { select: { id: true, name: true } },
+      driver: { select: { id: true, name: true } },
+    },
+  });
+  if (!vehicle) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  return NextResponse.json(vehicle);
+}
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+  const session = await auth();
+  const user = session?.user as any;
+
+  if (!["Super Admin", "Admin", "Vehicle Manager"].includes(user?.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const vehicle = await db.vehicle.findUnique({ where: { id } });
+  if (!vehicle) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const body = await req.json();
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const data = parsed.data;
+
+  const updated = await db.vehicle.update({
+    where: { id },
+    data: {
+      ...(data.vehicleName        !== undefined && { vehicleName:        data.vehicleName }),
+      ...(data.make               !== undefined && { make:               data.make }),
+      ...(data.model              !== undefined && { model:              data.model }),
+      ...(data.vehicleType        !== undefined && { vehicleType:        data.vehicleType as any }),
+      ...(data.fuelType           !== undefined && { fuelType:           data.fuelType as any }),
+      ...(data.ownershipType      !== undefined && { ownershipType:      data.ownershipType as any }),
+      ...(data.yearOfManufacture  !== undefined && { yearOfManufacture:  data.yearOfManufacture }),
+      ...(data.engineNumber       !== undefined && { engineNumber:       data.engineNumber }),
+      ...(data.chassisNumber      !== undefined && { chassisNumber:      data.chassisNumber }),
+      ...(data.registrationDate   !== undefined && { registrationDate:   new Date(data.registrationDate!) }),
+      ...(data.registrationExpiry !== undefined && { registrationExpiry: new Date(data.registrationExpiry!) }),
+      ...(data.odometer           !== undefined && { odometer:           data.odometer }),
+      ...(data.seatingCapacity    !== undefined && { seatingCapacity:    data.seatingCapacity }),
+      ...(data.loadCapacity       !== undefined && { loadCapacity:       data.loadCapacity }),
+      ...(data.colour             !== undefined && { colour:             data.colour }),
+      ...(data.fastagNumber       !== undefined && { fastagNumber:       data.fastagNumber }),
+      ...(data.purposeOfUsage     !== undefined && { purposeOfUsage:     data.purposeOfUsage as any }),
+      ...(data.status             !== undefined && { status:             data.status as any }),
+      ...(data.branchId           !== undefined && { branchId:           data.branchId }),
+      ...(data.driverId           !== undefined && { driverId:           data.driverId }),
+      ...(data.remarks            !== undefined && { remarks:            data.remarks }),
+    },
+  });
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  await db.auditLog.create({
+    data: {
+      userId:     user.id,
+      action:     "UPDATE",
+      module:     "VEHICLE",
+      entityId:   id,
+      entityType: "Vehicle",
+      oldValue: { vehicleNumber: vehicle.vehicleNumber, status: vehicle.status, odometer: vehicle.odometer },
+      newValue: { vehicleNumber: updated.vehicleNumber, status: updated.status, odometer: updated.odometer },
+      ipAddress:  req.headers.get("x-forwarded-for") ?? null,
+    },
+  });
+
+  return NextResponse.json({ id: updated.id });
+}

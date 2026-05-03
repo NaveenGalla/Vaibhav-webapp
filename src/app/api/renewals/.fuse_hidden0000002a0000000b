@@ -1,0 +1,81 @@
+// POST /api/renewals — create a renewal record
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { z } from "zod";
+
+const schema = z.object({
+  vehicleId:      z.string().min(1),
+  renewalType:    z.enum(["INSURANCE", "POLLUTION", "FITNESS", "PERMIT", "ROAD_TAX", "DRIVER_LICENSE", "AMC", "OTHER"]),
+  issueDate:      z.string().optional().nullable(),
+  expiryDate:     z.string().min(1),
+  policyOrCertNo: z.string().optional().nullable(),
+  insuredValue:   z.coerce.number().optional().nullable(),
+  premium:        z.coerce.number().optional().nullable(),
+  provider:       z.string().optional().nullable(),
+  remarks:        z.string().optional().nullable(),
+});
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  const user    = session?.user as any;
+  if (!user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!["Super Admin", "Admin"].includes(user.role))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const parsed = schema.safeParse(await req.json());
+  if (!parsed.success)
+    return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 400 });
+
+  const d = parsed.data;
+
+  const vehicle = await db.vehicle.findUnique({ where: { id: d.vehicleId } });
+  if (!vehicle) return NextResponse.json({ error: "Vehicle not found." }, { status: 404 });
+
+  const renewal = await db.renewal.create({
+    data: {
+      vehicleId:      d.vehicleId,
+      renewalType:    d.renewalType,
+      issueDate:      d.issueDate  ? new Date(d.issueDate)  : null,
+      expiryDate:     new Date(d.expiryDate),
+      policyOrCertNo: d.policyOrCertNo ?? null,
+      insuredValue:   d.insuredValue   ?? null,
+      premium:        d.premium        ?? null,
+      provider:       d.provider       ?? null,
+      remarks:        d.remarks        ?? null,
+      updatedById:    user.id,
+    },
+  });
+
+  // Auto-create reminders at 30, 15, 7, 1 days before expiry
+  const expiryTime  = new Date(d.expiryDate).getTime();
+  const reminderDays = [30, 15, 7, 1];
+  await Promise.all(
+    reminderDays.map((days) =>
+      db.reminder.create({
+        data: {
+          vehicleId:    d.vehicleId,
+          renewalId:    renewal.id,
+          type:         "RENEWAL",
+          title:        `${d.renewalType.replace(/_/g, " ")} expiring in ${days} day${days > 1 ? "s" : ""}`,
+          dueDate:      new Date(expiryTime - days * 86_400_000),
+          status:       "PENDING",
+          createdById:  user.id,
+        },
+      })
+    )
+  );
+
+  await db.auditLog.create({
+    data: {
+      userId:     user.id,
+      action:     "CREATE",
+      module:     "RENEWAL",
+      entityId:   renewal.id,
+      entityType: "Renewal",
+      newValue:   JSON.stringify({ vehicleId: d.vehicleId, renewalType: d.renewalType, expiryDate: d.expiryDate }),
+    },
+  });
+
+  return NextResponse.json({ id: renewal.id }, { status: 201 });
+}

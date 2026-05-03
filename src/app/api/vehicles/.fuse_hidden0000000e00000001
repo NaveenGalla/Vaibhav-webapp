@@ -1,0 +1,106 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/vehicles — create a new vehicle
+// GET  /api/vehicles — list (used by other server components)
+// ─────────────────────────────────────────────────────────────────────────────
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { z } from "zod";
+
+const createSchema = z.object({
+  vehicleNumber:      z.string().min(1).max(20).toUpperCase(),
+  vehicleName:        z.string().optional(),
+  make:               z.string().min(1),
+  model:              z.string().min(1),
+  vehicleType:        z.enum(["FOUR_WHEELER", "TWO_WHEELER", "VAN", "TRUCK", "OTHER"]),
+  fuelType:           z.enum(["PETROL", "DIESEL", "CNG", "EV", "HYBRID"]),
+  ownershipType:      z.enum(["OWNED", "LEASED", "HIRED"]),
+  yearOfManufacture:  z.coerce.number().optional(),
+  engineNumber:       z.string().optional(),
+  chassisNumber:      z.string().optional(),
+  registrationDate:   z.string().optional(),
+  registrationExpiry: z.string().optional(),
+  odometer:           z.coerce.number().default(0),
+  seatingCapacity:    z.coerce.number().optional(),
+  loadCapacity:       z.coerce.number().optional(),
+  colour:             z.string().optional(),
+  fastagNumber:       z.string().optional(),
+  purposeOfUsage:     z.string().optional(),
+  branchId:           z.string().min(1),
+  driverId:           z.string().optional(),
+  remarks:            z.string().optional(),
+});
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  const user = session?.user as any;
+
+  if (!["Super Admin", "Admin", "Vehicle Manager"].includes(user?.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const parsed = createSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const data = parsed.data;
+
+  // Check unique vehicle number
+  const existing = await db.vehicle.findUnique({
+    where: { vehicleNumber: data.vehicleNumber },
+  });
+  if (existing) {
+    return NextResponse.json(
+      { error: `Vehicle number ${data.vehicleNumber} already exists.` },
+      { status: 409 },
+    );
+  }
+
+  const vehicle = await db.vehicle.create({
+    data: {
+      vehicleNumber:      data.vehicleNumber,
+      vehicleName:        data.vehicleName ?? null,
+      make:               data.make,
+      model:              data.model,
+      vehicleType:        data.vehicleType as any,
+      fuelType:           data.fuelType as any,
+      ownershipType:      data.ownershipType as any,
+      yearOfManufacture:  data.yearOfManufacture ?? null,
+      engineNumber:       data.engineNumber ?? null,
+      chassisNumber:      data.chassisNumber ?? null,
+      registrationDate:   data.registrationDate   ? new Date(data.registrationDate)   : null,
+      registrationExpiry: data.registrationExpiry ? new Date(data.registrationExpiry) : null,
+      odometer:           data.odometer,
+      seatingCapacity:    data.seatingCapacity ?? null,
+      loadCapacity:       data.loadCapacity ?? null,
+      colour:             data.colour ?? null,
+      fastagNumber:       data.fastagNumber ?? null,
+      purposeOfUsage:     data.purposeOfUsage as any ?? null,
+      branchId:           data.branchId,
+      driverId:           data.driverId || null,
+      remarks:            data.remarks ?? null,
+      status:             "ACTIVE",
+    },
+  });
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  await db.auditLog.create({
+    data: {
+      userId:     user.id,
+      action:     "CREATE",
+      module:     "VEHICLE",
+      entityId:   vehicle.id,
+      entityType: "Vehicle",
+      newValue:   JSON.stringify({ vehicleNumber: vehicle.vehicleNumber }),
+      ipAddress:  req.headers.get("x-forwarded-for") ?? null,
+    },
+  });
+
+  return NextResponse.json({ id: vehicle.id }, { status: 201 });
+}

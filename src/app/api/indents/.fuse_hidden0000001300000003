@@ -1,0 +1,83 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/indents — create indent (DRAFT or SUBMITTED)
+// ─────────────────────────────────────────────────────────────────────────────
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { z } from "zod";
+import { generateRefNumber } from "@/lib/utils";
+
+const schema = z.object({
+  branchId:            z.string().min(1),
+  department:          z.string().optional(),
+  purpose:             z.string().min(1),
+  vehicleReqDate:      z.string().min(1),
+  expectedReturnDate:  z.string().optional(),
+  destination:         z.string().min(1),
+  estimatedKm:         z.coerce.number().optional(),
+  vehicleTypeRequired: z.string().optional(),
+  driverRequired:      z.boolean().default(false),
+  fuelAdvanceRequired: z.boolean().default(false),
+  fuelAdvanceAmount:   z.coerce.number().optional(),
+  remarks:             z.string().optional(),
+  submitNow:           z.boolean().default(false),
+});
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  const user    = session?.user as any;
+  if (!user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const parsed = schema.safeParse(await req.json());
+  if (!parsed.success)
+    return NextResponse.json({ error: "Validation failed", issues: parsed.error.flatten() }, { status: 400 });
+
+  const d      = parsed.data;
+  const status = d.submitNow ? "SUBMITTED" : "DRAFT";
+
+  // Generate unique indent number: IND-2024-00042
+  const count = await db.indent.count();
+  const indentNumber = generateRefNumber("IND", count + 1);
+
+  const indent = await db.indent.create({
+    data: {
+      indentNumber,
+      requestedById:       user.id,
+      branchId:            d.branchId,
+      department:          d.department   ?? null,
+      purpose:             d.purpose,
+      vehicleReqDate:      new Date(d.vehicleReqDate),
+      expectedReturnDate:  d.expectedReturnDate ? new Date(d.expectedReturnDate) : null,
+      destination:         d.destination,
+      estimatedKm:         d.estimatedKm ?? null,
+      vehicleTypeRequired: d.vehicleTypeRequired ?? null,
+      driverRequired:      d.driverRequired,
+      fuelAdvanceRequired: d.fuelAdvanceRequired,
+      fuelAdvanceAmount:   d.fuelAdvanceAmount ?? null,
+      remarks:             d.remarks ?? null,
+      status:              status as any,
+    },
+  });
+
+  // Create approval record when submitted
+  if (status === "SUBMITTED") {
+    await db.indentApproval.create({
+      data: {
+        indentId:   indent.id,
+        approverId: user.id, // Placeholder — in real flow, look up the assigned approver
+        level:      1,
+        status:     "PENDING",
+      },
+    });
+  }
+
+  await db.auditLog.create({
+    data: {
+      userId: user.id, action: status === "SUBMITTED" ? "SUBMIT" : "CREATE",
+      module: "INDENT", entityId: indent.id, entityType: "Indent",
+      newValue: JSON.stringify({ indentNumber, status }),
+    },
+  });
+
+  return NextResponse.json({ id: indent.id }, { status: 201 });
+}

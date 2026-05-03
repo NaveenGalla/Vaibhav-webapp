@@ -1,0 +1,727 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Prisma Schema — Vaibhav Jewellers Vehicle & Fuel Management System
+// Aligned with blueprint v2 and the existing Next.js app surface.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum FuelType {
+  PETROL
+  DIESEL
+  CNG
+  EV
+  HYBRID
+}
+
+enum VehicleType {
+  FOUR_WHEELER
+  TWO_WHEELER
+  VAN
+  TRUCK
+  OTHER
+}
+
+enum OwnershipType {
+  OWNED
+  LEASED
+  HIRED
+  CONTRACT
+}
+
+enum VehicleStatus {
+  ACTIVE
+  IN_SERVICE
+  INACTIVE
+  DISPOSED
+  SCRAPPED
+  SOLD
+}
+
+enum DriverStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+}
+
+enum IndentStatus {
+  DRAFT
+  SUBMITTED
+  CORRECTION
+  APPROVED
+  REJECTED
+  ASSIGNED
+  IN_USE
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CORRECTION
+}
+
+enum FuelApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FuelUseType {
+  OFFICIAL
+  PERSONAL
+}
+
+enum RenewalType {
+  INSURANCE
+  POLLUTION
+  FITNESS
+  PERMIT
+  ROAD_TAX
+  DRIVER_LICENSE
+  AMC
+  OTHER
+}
+
+enum ReminderType {
+  RENEWAL
+  SERVICE
+  DOCUMENT
+  CUSTOM
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  ACKNOWLEDGED
+  DISMISSED
+  OVERDUE
+}
+
+enum PurposeOfUsage {
+  ADMIN
+  SRM
+  BTL_BRANDING
+  MARKETING_BRANDING
+  MANAGEMENT
+  CMD_HOUSE
+  D2D_BRANDING
+  V_SQUARE
+  OTHER
+}
+
+enum ProcurementStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+enum DisposalStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum DisposalReason {
+  REGULAR_MAINTENANCE_SOLD
+  BREAKDOWN
+  SCRAPPED
+  OTHER
+}
+
+enum RepairStatus {
+  PENDING
+  IN_REPAIR
+  REPAIRED
+}
+
+enum NotificationType {
+  REMINDER
+  APPROVAL
+  REJECTION
+  DISPOSAL
+  PROCUREMENT
+  SYSTEM
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE MASTER DATA
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Branch {
+  id        String   @id @default(uuid())
+  name      String
+  code      String?  @unique
+  city      String?
+  state     String?
+  address   String?
+  phone     String?
+  email     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users               User[]
+  vehicles            Vehicle[]
+  drivers             Driver[]
+  indents             Indent[]
+  fuelEntries         FuelEntry[]
+  serviceEntries      ServiceEntry[]
+  procurementRequests VehicleProcurementRequest[]
+  disposalRequests    VehicleDisposalRequest[]
+
+  @@map("branches")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  employeeId String?
+  phone      String?
+  password   String
+  role       String
+  roleId     String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId String?
+
+  roleRecord Role? @relation(fields: [roleId], references: [id])
+
+  indentsCreated               Indent[]                    @relation("IndentCreator")
+  indentApprovals              IndentApproval[]
+  fuelEntriesEntered           FuelEntry[]                 @relation("FuelEnteredBy")
+  fuelEntriesApproved          FuelEntry[]                 @relation("FuelApprovedBy")
+  serviceEntriesCreated        ServiceEntry[]              @relation("ServiceCreatedBy")
+  serviceEntriesEntered        ServiceEntry[]              @relation("ServiceEnteredBy")
+  repairEntries                RepairEntry[]
+  renewals                     Renewal[]
+  documentsUploaded            VehicleDocument[]
+  tyreRecords                  TyreRecord[]
+  accidentRecords              AccidentRecord[]
+  auditLogs                    AuditLog[]
+  remindersCreated             Reminder[]                  @relation("ReminderCreatedBy")
+  notifications                Notification[]
+  procurementRequestsRequested VehicleProcurementRequest[] @relation("ProcurementRequestedBy")
+  procurementRequestsApproved  VehicleProcurementRequest[] @relation("ProcurementApprovedBy")
+  vehicleInwardsReceived       VehicleInward[]
+  disposalRequestsRequested    VehicleDisposalRequest[]    @relation("DisposalRequestedBy")
+  disposalRequestsApproved     VehicleDisposalRequest[]    @relation("DisposalApprovedBy")
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  permissions Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model Driver {
+  id            String       @id @default(uuid())
+  name          String
+  employeeId    String?
+  phone         String?
+  email         String?
+  licenseNumber String?      @unique
+  licenseExpiry DateTime?
+  licenseType   String?
+  address       String?
+  remarks       String?
+  status        DriverStatus @default(ACTIVE)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId String?
+
+  assignedVehicles Vehicle[]        @relation("DriverAssignedVehicles")
+  indentsAssigned  Indent[]
+  fuelEntries      FuelEntry[]
+  accidentRecords  AccidentRecord[]
+
+  @@map("drivers")
+}
+
+model Vehicle {
+  id                 String          @id @default(uuid())
+  vehicleNumber      String          @unique
+  vehicleName        String?
+  make               String?
+  model              String?
+  fuelType           FuelType
+  vehicleType        VehicleType
+  yearOfManufacture  Int?
+  ownershipType      OwnershipType   @default(OWNED)
+  status             VehicleStatus   @default(ACTIVE)
+  purposeOfUsage     PurposeOfUsage?
+  odometer           Int             @default(0)
+  seatingCapacity    Int?
+  loadCapacity       Int?
+  colour             String?
+  fastagNumber       String?
+  chassisNumber      String?
+  engineNumber       String?
+  registrationDate   DateTime?
+  registrationExpiry DateTime?
+  remarks            String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId String?
+
+  driver   Driver? @relation("DriverAssignedVehicles", fields: [driverId], references: [id])
+  driverId String?
+
+  indents          Indent[]
+  fuelEntries      FuelEntry[]
+  serviceEntries   ServiceEntry[]
+  repairEntries    RepairEntry[]
+  renewals         Renewal[]
+  reminders        Reminder[]
+  documents        VehicleDocument[]
+  tyreRecords      TyreRecord[]
+  accidentRecords  AccidentRecord[]
+  vehicleInward    VehicleInward?
+  disposalRequests VehicleDisposalRequest[]
+
+  @@map("vehicles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INDENT / APPROVAL WORKFLOW
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Indent {
+  id                  String       @id @default(uuid())
+  indentNumber        String       @unique
+  department          String?
+  purpose             String
+  vehicleReqDate      DateTime
+  expectedReturnDate  DateTime?
+  destination         String?
+  estimatedKm         Int?
+  vehicleTypeRequired VehicleType?
+  driverRequired      Boolean      @default(false)
+  fuelAdvanceRequired Boolean      @default(false)
+  fuelAdvanceAmount   Decimal?
+  status              IndentStatus @default(DRAFT)
+  actualStartKm       Int?
+  actualEndKm         Int?
+  actualFuelUsed      Decimal?
+  actualExpense       Decimal?
+  closureRemarks      String?
+  remarks             String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  requestedBy   User   @relation("IndentCreator", fields: [requestedById], references: [id])
+  requestedById String
+
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId String
+
+  assignedVehicle   Vehicle? @relation(fields: [assignedVehicleId], references: [id])
+  assignedVehicleId String?
+
+  assignedDriver   Driver? @relation(fields: [assignedDriverId], references: [id])
+  assignedDriverId String?
+
+  approvals   IndentApproval[]
+  fuelEntries FuelEntry[]
+
+  @@map("indents")
+}
+
+model IndentApproval {
+  id         String         @id @default(uuid())
+  level      Int            @default(1)
+  status     ApprovalStatus @default(PENDING)
+  action     String?
+  remarks    String?
+  actionedAt DateTime?
+  createdAt  DateTime       @default(now())
+
+  indent   Indent @relation(fields: [indentId], references: [id])
+  indentId String
+
+  approver   User   @relation(fields: [approverId], references: [id])
+  approverId String
+
+  @@map("indent_approvals")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUEL / SERVICE / REPAIR
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FuelEntry {
+  id                 String             @id @default(uuid())
+  date               DateTime
+  fuelType           FuelType
+  officialOrPersonal FuelUseType        @default(OFFICIAL)
+  quantityLitres     Decimal
+  ratePerLitre       Decimal
+  totalAmount        Decimal
+  odometer           Int
+  openingKm          Int?
+  closingKm          Int?
+  fuelStation        String?
+  billNumber         String?
+  billImage          String?
+  billUrl            String?
+  driverName         String?
+  approvalStatus     FuelApprovalStatus @default(PENDING)
+  approvedAt         DateTime?
+  remarks            String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  indent   Indent? @relation(fields: [indentId], references: [id])
+  indentId String?
+
+  driver   Driver? @relation(fields: [driverId], references: [id])
+  driverId String?
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId String?
+
+  enteredBy   User   @relation("FuelEnteredBy", fields: [enteredById], references: [id])
+  enteredById String
+
+  approvedBy   User?   @relation("FuelApprovedBy", fields: [approvedById], references: [id])
+  approvedById String?
+
+  @@map("fuel_entries")
+}
+
+model ServiceEntry {
+  id              String    @id @default(uuid())
+  serviceDate     DateTime
+  serviceType     String
+  description     String?
+  odometer        Int
+  vendor          String?
+  invoiceNumber   String?
+  invoiceUrl      String?
+  cost            Decimal?
+  laborCost       Decimal?
+  partsCost       Decimal?
+  nextServiceDate DateTime?
+  nextServiceKm   Int?
+  remarks         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId String?
+
+  createdBy   User?   @relation("ServiceCreatedBy", fields: [createdById], references: [id])
+  createdById String?
+
+  enteredBy   User?   @relation("ServiceEnteredBy", fields: [enteredById], references: [id])
+  enteredById String?
+
+  @@map("service_entries")
+}
+
+model RepairEntry {
+  id            String   @id @default(uuid())
+  repairDate    DateTime
+  repairType    String?
+  description   String
+  odometer      Int?
+  vendor        String?
+  invoiceNumber String?
+  invoiceUrl    String?
+  cost          Decimal?
+  remarks       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  @@map("repair_entries")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCUMENTS / RENEWALS / REMINDERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model VehicleDocument {
+  id           String      @id @default(uuid())
+  documentType RenewalType
+  fileUrl      String?
+  fileName     String?
+  issueDate    DateTime?
+  expiryDate   DateTime?
+  amount       Decimal?
+  remarks      String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+  uploadedById String?
+
+  @@map("vehicle_documents")
+}
+
+model Renewal {
+  id             String      @id @default(uuid())
+  renewalType    RenewalType
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  policyOrCertNo String?
+  provider       String?
+  insuredValue   Decimal?
+  premium        Decimal?
+  remarks        String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  updatedByUser User?   @relation(fields: [updatedById], references: [id])
+  updatedById   String?
+
+  reminders Reminder[]
+
+  @@unique([vehicleId, renewalType])
+  @@map("renewals")
+}
+
+model Reminder {
+  id             String         @id @default(uuid())
+  type           ReminderType
+  title          String
+  message        String?
+  dueDate        DateTime?
+  dueKm          Int?
+  status         ReminderStatus @default(PENDING)
+  daysBeforeDue  Int?
+  isAcknowledged Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicleId String?
+
+  renewal   Renewal? @relation(fields: [renewalId], references: [id])
+  renewalId String?
+
+  createdBy   User?   @relation("ReminderCreatedBy", fields: [createdById], references: [id])
+  createdById String?
+
+  @@map("reminders")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYRES / ACCIDENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TyreRecord {
+  id           String    @id @default(uuid())
+  recordDate   DateTime
+  changeDate   DateTime?
+  odometer     Int?
+  tyrePosition String?
+  tyreBrand    String?
+  tyreSize     String?
+  quantity     Int?
+  cost         Decimal?
+  vendor       String?
+  invoiceUrl   String?
+  nextChangeKm Int?
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  enteredBy   User?   @relation(fields: [enteredById], references: [id])
+  enteredById String?
+
+  @@map("tyre_records")
+}
+
+model AccidentRecord {
+  id             String       @id @default(uuid())
+  accidentDate   DateTime
+  location       String?
+  description    String
+  damageEstimate Decimal?
+  repairCost     Decimal?
+  repairStatus   RepairStatus @default(PENDING)
+  fileUrl        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  driver   Driver? @relation(fields: [driverId], references: [id])
+  driverId String?
+
+  enteredBy   User?   @relation(fields: [enteredById], references: [id])
+  enteredById String?
+
+  @@map("accident_records")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VEHICLE LIFECYCLE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model VehicleProcurementRequest {
+  id             String            @id @default(uuid())
+  requestNumber  String            @unique
+  vehicleType    VehicleType
+  fuelType       FuelType
+  purpose        PurposeOfUsage?
+  preferredBrand String?
+  requiredByDate DateTime?
+  status         ProcurementStatus @default(DRAFT)
+  remarks        String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId String
+
+  requestedBy   User   @relation("ProcurementRequestedBy", fields: [requestedById], references: [id])
+  requestedById String
+
+  approvedBy   User?   @relation("ProcurementApprovedBy", fields: [approvedById], references: [id])
+  approvedById String?
+
+  vehicleInwards VehicleInward[]
+
+  @@map("vehicle_procurement_requests")
+}
+
+model VehicleInward {
+  id            String    @id @default(uuid())
+  invoiceDate   DateTime?
+  invoiceNumber String?
+  invoiceAmount Decimal?
+  vendor        String?
+  invoiceUrl    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  procurementRequest   VehicleProcurementRequest @relation(fields: [procurementRequestId], references: [id])
+  procurementRequestId String
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String  @unique
+
+  receivedBy   User?   @relation(fields: [receivedById], references: [id])
+  receivedById String?
+
+  @@map("vehicle_inwards")
+}
+
+model VehicleDisposalRequest {
+  id                 String         @id @default(uuid())
+  requestNumber      String         @unique
+  reason             DisposalReason
+  odometerAtDisposal Int?
+  saleAmount         Decimal?
+  buyerDetails       String?
+  status             DisposalStatus @default(REQUESTED)
+  remarks            String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId String?
+
+  requestedBy   User   @relation("DisposalRequestedBy", fields: [requestedById], references: [id])
+  requestedById String
+
+  approvedBy   User?   @relation("DisposalApprovedBy", fields: [approvedById], references: [id])
+  approvedById String?
+
+  @@map("vehicle_disposal_requests")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS / AUDIT LOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  title     String
+  message   String?
+  type      NotificationType @default(SYSTEM)
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  module     String
+  action     String
+  entityId   String?
+  entityType String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
+
+  @@map("audit_logs")
+}

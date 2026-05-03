@@ -1,0 +1,50 @@
+// POST /api/indents/[id]/close — close a completed indent
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { canSeeBranch, hasRole } from "@/lib/rbac";
+import { z } from "zod";
+
+const schema = z.object({ remarks: z.string().optional() });
+interface Ctx { params: Promise<{ id: string }> }
+
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { id }  = await params;
+  const session = await auth();
+  const user    = session?.user as any;
+
+  if (!hasRole(user, "indentApprover"))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const indent = await db.indent.findUnique({ where: { id } });
+  if (!indent) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canSeeBranch(user, indent.branchId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (indent.status !== "COMPLETED")
+    return NextResponse.json({ error: "Indent must be COMPLETED before closing." }, { status: 400 });
+
+  const parsed = schema.safeParse(await req.json());
+  const remarks = parsed.success ? (parsed.data.remarks ?? null) : null;
+
+  await db.indent.update({
+    where: { id },
+    data:  { status: "CLOSED", closureRemarks: remarks },
+  });
+
+  // Free up the vehicle
+  if (indent.assignedVehicleId) {
+    await db.vehicle.update({
+      where: { id: indent.assignedVehicleId },
+      data:  { status: "ACTIVE" },
+    });
+  }
+
+  await db.auditLog.create({
+    data: {
+      userId: user.id, action: "CLOSE", module: "INDENT",
+      entityId: id, entityType: "Indent",
+      newValue: { status: "CLOSED", remarks },
+    },
+  });
+
+  return NextResponse.json({ id, status: "CLOSED" });
+}

@@ -1,0 +1,85 @@
+// PATCH /api/renewals/[id] — update a renewal record
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { z } from "zod";
+
+const schema = z.object({
+  issueDate:      z.string().optional().nullable(),
+  expiryDate:     z.string().min(1),
+  policyOrCertNo: z.string().optional().nullable(),
+  insuredValue:   z.coerce.number().optional().nullable(),
+  premium:        z.coerce.number().optional().nullable(),
+  provider:       z.string().optional().nullable(),
+  remarks:        z.string().optional().nullable(),
+});
+
+interface Ctx { params: Promise<{ id: string }> }
+
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const { id }  = await params;
+  const session = await auth();
+  const user    = session?.user as any;
+  if (!["Super Admin", "Admin"].includes(user?.role))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const existing = await db.renewal.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const parsed = schema.safeParse(await req.json());
+  if (!parsed.success)
+    return NextResponse.json({ error: "Validation failed" }, { status: 400 });
+
+  const d = parsed.data;
+
+  const updated = await db.renewal.update({
+    where: { id },
+    data: {
+      issueDate:      d.issueDate  ? new Date(d.issueDate)  : null,
+      expiryDate:     new Date(d.expiryDate),
+      policyOrCertNo: d.policyOrCertNo ?? null,
+      insuredValue:   d.insuredValue   ?? null,
+      premium:        d.premium        ?? null,
+      provider:       d.provider       ?? null,
+      remarks:        d.remarks        ?? null,
+      updatedById:    user.id,
+    },
+  });
+
+  // Remove old pending reminders and recreate for new expiry
+  await db.reminder.deleteMany({
+    where: { renewalId: id, status: "PENDING" },
+  });
+
+  const expiryTime   = new Date(d.expiryDate).getTime();
+  const reminderDays = [30, 15, 7, 1];
+  await Promise.all(
+    reminderDays.map((days) =>
+      db.reminder.create({
+        data: {
+          vehicleId:   existing.vehicleId,
+          renewalId:   id,
+          type:        "RENEWAL",
+          title:       `${existing.renewalType.replace(/_/g, " ")} expiring in ${days} day${days > 1 ? "s" : ""}`,
+          dueDate:     new Date(expiryTime - days * 86_400_000),
+          status:      "PENDING",
+          createdById: user.id,
+        },
+      })
+    )
+  );
+
+  await db.auditLog.create({
+    data: {
+      userId:     user.id,
+      action:     "UPDATE",
+      module:     "RENEWAL",
+      entityId:   id,
+      entityType: "Renewal",
+      oldValue:   JSON.stringify({ expiryDate: existing.expiryDate }),
+      newValue:   JSON.stringify({ expiryDate: d.expiryDate }),
+    },
+  });
+
+  return NextResponse.json({ id: updated.id });
+}

@@ -1,0 +1,69 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/indents/[id]/approve — approve / reject / send for correction
+// ─────────────────────────────────────────────────────────────────────────────
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { z } from "zod";
+
+const schema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED", "CORRECTION"]),
+  remarks:  z.string().optional(),
+});
+
+interface Ctx { params: Promise<{ id: string }> }
+
+export async function POST(req: NextRequest, { params }: Ctx) {
+  const { id }  = await params;
+  const session = await auth();
+  const user    = session?.user as any;
+
+  const isApprover = ["Super Admin", "Admin", "Branch Manager", "Department Head", "Approver"].includes(user?.role);
+  if (!isApprover)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const indent = await db.indent.findUnique({ where: { id } });
+  if (!indent) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (indent.status !== "SUBMITTED")
+    return NextResponse.json({ error: "Indent is not in SUBMITTED status." }, { status: 400 });
+
+  const parsed = schema.safeParse(await req.json());
+  if (!parsed.success)
+    return NextResponse.json({ error: "Validation failed" }, { status: 400 });
+
+  const { decision, remarks } = parsed.data;
+
+  // Record the approval decision
+  await db.indentApproval.create({
+    data: {
+      indentId:   id,
+      approverId: user.id,
+      level:      1,
+      status:     decision,
+      remarks:    remarks ?? null,
+    },
+  });
+
+  // Map decision to indent status
+  const statusMap: Record<string, string> = {
+    APPROVED:   "APPROVED",
+    REJECTED:   "REJECTED",
+    CORRECTION: "CORRECTION",
+  };
+
+  const updated = await db.indent.update({
+    where: { id },
+    data:  { status: statusMap[decision] as any },
+  });
+
+  await db.auditLog.create({
+    data: {
+      userId: user.id, action: decision, module: "INDENT",
+      entityId: id, entityType: "Indent",
+      oldValue: JSON.stringify({ status: "SUBMITTED" }),
+      newValue: JSON.stringify({ status: updated.status, remarks }),
+    },
+  });
+
+  return NextResponse.json({ id, status: updated.status });
+}
