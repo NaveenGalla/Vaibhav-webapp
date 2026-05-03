@@ -4,6 +4,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import BranchForm from "@/components/branches/BranchForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewBranchPage() {
   const session = await auth();
   const user    = session?.user as any;

@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 
+export const dynamic = "force-dynamic";
+
 const REPORTS = [
   {
     href: "/reports/vehicles",

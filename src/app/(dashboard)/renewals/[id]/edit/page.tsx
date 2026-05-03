@@ -5,6 +5,8 @@ import IconMark from "@/components/ui/IconMark";
 import { notFound } from "next/navigation";
 import RenewalForm from "@/components/renewals/RenewalForm";
 
+export const dynamic = "force-dynamic";
+
 interface Ctx { params: Promise<{ id: string }> }
 
 export default async function EditRenewalPage({ params }: Ctx) {

@@ -4,6 +4,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import RenewalForm from "@/components/renewals/RenewalForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewRenewalPage() {
   const session = await auth();
   const user    = session?.user as any;

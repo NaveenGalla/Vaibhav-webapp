@@ -4,6 +4,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import FuelEntryForm from "@/components/fuel/FuelEntryForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewFuelEntryPage() {
   const session = await auth();
   const user    = session?.user as any;

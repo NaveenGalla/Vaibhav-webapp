@@ -10,6 +10,8 @@ import { formatCurrency, formatDate, formatKm, daysUntil, renewalStatusColor } f
 import IconMark from "@/components/ui/IconMark";
 import VehicleLifeTimeline from "@/components/vehicles/VehicleLifeTimeline";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }

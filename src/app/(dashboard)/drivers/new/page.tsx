@@ -8,6 +8,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import DriverForm from "@/components/drivers/DriverForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewDriverPage() {
   const session = await auth();
   const user    = session?.user as any;

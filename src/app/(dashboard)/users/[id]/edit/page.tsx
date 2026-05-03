@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import UserForm from "@/components/users/UserForm";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps { params: Promise<{ id: string }> }
 
 const ROLES = [

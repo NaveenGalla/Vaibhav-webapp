@@ -4,6 +4,8 @@ import { syncDueReminderNotifications } from "@/lib/notifications";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function NotificationsPage() {
   const session = await auth();
   const user = session?.user as { id?: string } | undefined;

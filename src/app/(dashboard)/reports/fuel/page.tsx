@@ -7,6 +7,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import { formatCurrency } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: Promise<{ from?: string; to?: string; branch?: string; vehicle?: string }>;
 }

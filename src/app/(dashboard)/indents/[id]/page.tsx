@@ -9,6 +9,8 @@ import { formatCurrency, formatDate, formatKm } from "@/lib/utils";
 import IconMark from "@/components/ui/IconMark";
 import IndentActionPanel from "@/components/indents/IndentActionPanel";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps { params: Promise<{ id: string }> }
 
 const STATUS_BADGE: Record<string, string> = {

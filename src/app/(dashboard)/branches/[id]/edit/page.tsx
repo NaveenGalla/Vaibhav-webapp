@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import BranchForm from "@/components/branches/BranchForm";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps { params: Promise<{ id: string }> }
 
 export default async function EditBranchPage({ params }: PageProps) {

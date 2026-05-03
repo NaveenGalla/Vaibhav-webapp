@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { formatCurrency, formatKm } from "@/lib/utils";
 import LifecycleDecisionPanel from "@/components/operations/LifecycleDecisionPanel";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }

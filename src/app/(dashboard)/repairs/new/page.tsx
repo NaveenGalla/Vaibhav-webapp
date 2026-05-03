@@ -3,6 +3,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import OperationForm from "@/components/operations/OperationForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewRepairPage() {
   const vehicles = await db.vehicle.findMany({ select: { id: true, vehicleNumber: true, vehicleName: true }, orderBy: { vehicleNumber: "asc" } });
   return <NewShell back="/repairs" title="Add Repair Record"><OperationForm kind="repairs" vehicles={vehicles.map(v => ({ id: v.id, name: v.vehicleNumber, extra: v.vehicleName }))} /></NewShell>;

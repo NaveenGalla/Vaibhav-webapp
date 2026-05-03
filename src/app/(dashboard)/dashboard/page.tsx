@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 // Inline types (mirrors the Prisma query result shapes — avoids dependency on
 // generated @prisma/client types before "prisma generate" has been run)
 type RecentIndent = {

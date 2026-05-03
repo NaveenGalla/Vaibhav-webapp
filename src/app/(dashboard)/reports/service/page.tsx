@@ -4,6 +4,8 @@ import { formatCurrency, formatDate, formatKm } from "@/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: Promise<{ from?: string; to?: string; branch?: string; vehicle?: string }>;
 }

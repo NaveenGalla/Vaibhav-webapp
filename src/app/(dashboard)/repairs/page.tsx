@@ -3,6 +3,8 @@ import { formatCurrency, formatDate, formatKm } from "@/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+export const dynamic = "force-dynamic";
+
 export default async function RepairsPage() {
   const entries = await db.repairEntry.findMany({
     include: { vehicle: { select: { vehicleNumber: true, vehicleName: true } }, createdBy: { select: { name: true } } },

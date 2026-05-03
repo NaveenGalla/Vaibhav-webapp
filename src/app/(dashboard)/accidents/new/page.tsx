@@ -3,6 +3,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import OperationForm from "@/components/operations/OperationForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewAccidentPage() {
   const [vehicles, drivers] = await Promise.all([
     db.vehicle.findMany({ select: { id: true, vehicleNumber: true, vehicleName: true }, orderBy: { vehicleNumber: "asc" } }),

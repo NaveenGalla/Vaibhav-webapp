@@ -5,6 +5,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import UserForm from "@/components/users/UserForm";
 
+export const dynamic = "force-dynamic";
+
 const ROLES = [
   "Super Admin",
   "Admin",

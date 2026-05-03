@@ -4,6 +4,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import IndentForm from "@/components/indents/IndentForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewIndentPage() {
   const session = await auth();
   const user    = session?.user as any;

@@ -9,6 +9,8 @@ import IconMark from "@/components/ui/IconMark";
 import VehicleFilters from "@/components/vehicles/VehicleFilters";
 import VehicleTable from "@/components/vehicles/VehicleTable";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: Promise<{
     q?: string;

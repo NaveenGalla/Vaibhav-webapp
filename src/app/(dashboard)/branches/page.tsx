@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 
+export const dynamic = "force-dynamic";
+
 export default async function BranchesPage() {
   const session = await auth();
   const user    = session?.user as any;

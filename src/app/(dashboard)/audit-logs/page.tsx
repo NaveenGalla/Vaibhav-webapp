@@ -7,6 +7,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import { formatDate } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: Promise<{
     q?: string; module?: string; action?: string; user?: string;

@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { formatCurrency, formatKm } from "@/lib/utils";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function DisposalPage() {
   const requests = await db.vehicleDisposalRequest.findMany({
     include: {

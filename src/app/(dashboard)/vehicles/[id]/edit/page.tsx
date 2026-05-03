@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import VehicleForm from "@/components/vehicles/VehicleForm";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }

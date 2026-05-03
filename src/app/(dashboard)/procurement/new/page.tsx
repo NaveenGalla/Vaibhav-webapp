@@ -3,6 +3,8 @@ import Link from "next/link";
 import IconMark from "@/components/ui/IconMark";
 import OperationForm from "@/components/operations/OperationForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewProcurementPage() {
   const branches = await db.branch.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
   return <NewShell back="/procurement" title="New Procurement Request"><OperationForm kind="procurement" branches={branches} /></NewShell>;

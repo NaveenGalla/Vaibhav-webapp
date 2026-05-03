@@ -3,6 +3,8 @@ import { formatCurrency, formatDate, formatKm } from "@/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+export const dynamic = "force-dynamic";
+
 export default async function TyresPage() {
   const entries = await db.tyreRecord.findMany({
     include: { vehicle: { select: { vehicleNumber: true, vehicleName: true } }, enteredBy: { select: { name: true } } },

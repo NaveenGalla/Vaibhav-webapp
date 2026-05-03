@@ -8,6 +8,8 @@ import IconMark from "@/components/ui/IconMark";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { hasRole, scopedBranchWhere } from "@/lib/rbac";
 
+export const dynamic = "force-dynamic";
+
 export default async function ApprovalsPage() {
   const session = await auth();
   const user    = session?.user as any;

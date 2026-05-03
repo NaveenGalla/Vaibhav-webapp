@@ -4,6 +4,8 @@ import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+export const dynamic = "force-dynamic";
+
 type ExpenseRow = {
   vehicle: string;
   branch: string;

@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import DriverForm from "@/components/drivers/DriverForm";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps { params: Promise<{ id: string }> }
 
 export default async function EditDriverPage({ params }: PageProps) {
