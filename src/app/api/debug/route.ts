@@ -8,7 +8,7 @@ export async function GET() {
     const userCount = await db.user.count();
     const adminUser = await db.user.findUnique({
       where: { email: "admin@vaibhavjewellers.com" },
-      select: { id: true, email: true, role: true, isActive: true, password: true },
+      select: { id: true, email: true, isActive: true, password: true },
     });
     return NextResponse.json({
       ok: true,
